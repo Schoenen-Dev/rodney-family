@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: bot-manager
+    runtime: node
+    rootDir: .
+    buildCommand: cd backend && npm install && cd ../bots && npm install
+    startCommand: node backend/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        fromPort: true
+    # Render provides Chrome via the Playwright/Puppeteer buildpack
+    # We need the chrome addon - set this environment variable:
+      - key: PUPPETEER_SKIP_DOWNLOAD
+        value: "true"

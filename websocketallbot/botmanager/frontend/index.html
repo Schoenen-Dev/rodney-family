@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bot Manager Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d2e;
+      --surface2: #252840;
+      --border: #2e3154;
+      --accent: #6c63ff;
+      --accent2: #8b85ff;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+      --blue: #3b82f6;
+      --text: #e2e8f0;
+      --muted: #8892a4;
+      --success-bg: #052e16;
+      --error-bg: #450a0a;
+      --warn-bg: #422006;
+      --info-bg: #0c1a2e;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .logo { font-size: 22px; font-weight: 700; color: var(--accent2); letter-spacing: -0.5px; }
+    .logo span { color: var(--muted); font-weight: 400; font-size: 14px; margin-left: 8px; }
+    .ws-indicator {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--muted);
+    }
+    .ws-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--red);
+      transition: background 0.3s;
+    }
+    .ws-dot.connected { background: var(--green); }
+
+    /* ── Global Actions ── */
+    .global-actions { display: flex; gap: 10px; padding: 16px 24px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 18px; border-radius: 8px; border: none;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: all 0.15s; outline: none;
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--accent2); }
+    .btn-danger { background: var(--red); color: #fff; }
+    .btn-danger:hover:not(:disabled) { background: #dc2626; }
+    .btn-outline {
+      background: transparent; color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover:not(:disabled) { background: var(--surface2); }
+    .btn-sm { padding: 5px 12px; font-size: 13px; }
+
+    /* ── Stats Bar ── */
+    .stats-bar {
+      display: flex; gap: 16px; padding: 0 24px 16px;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 18px; min-width: 120px;
+    }
+    .stat-card .val { font-size: 24px; font-weight: 700; }
+    .stat-card .lbl { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .stat-card.green .val { color: var(--green); }
+    .stat-card.red .val { color: var(--red); }
+    .stat-card.yellow .val { color: var(--yellow); }
+    .stat-card.accent .val { color: var(--accent2); }
+
+    /* ── Layout ── */
+    .main { display: flex; height: calc(100vh - 160px); }
+    .bot-list {
+      width: 360px; min-width: 280px;
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+    .log-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* ── Bot Cards ── */
+    .bot-card {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.1s;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .bot-card:hover { background: var(--surface); }
+    .bot-card.active { background: var(--surface2); border-left: 3px solid var(--accent); }
+
+    .bot-info { flex: 1; min-width: 0; }
+    .bot-name { font-weight: 600; font-size: 15px; }
+    .bot-user { font-size: 12px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bot-meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+    .status-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 9px; border-radius: 20px;
+      font-size: 11px; font-weight: 600; white-space: nowrap;
+    }
+    .status-badge .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .status-running  { background: #052e16; color: var(--green); }
+    .status-running .dot { background: var(--green); animation: pulse 1.5s infinite; }
+    .status-stopped  { background: #1e1e2e; color: var(--muted); }
+    .status-stopped .dot { background: var(--muted); }
+    .status-starting { background: #1c1a00; color: var(--yellow); }
+    .status-starting .dot { background: var(--yellow); animation: pulse 0.8s infinite; }
+    .status-stopping { background: #1c1a00; color: var(--yellow); }
+    .status-stopping .dot { background: var(--yellow); }
+    .status-error    { background: var(--error-bg); color: var(--red); }
+    .status-error .dot { background: var(--red); }
+    .status-crashed  { background: var(--error-bg); color: #ff6b6b; }
+    .status-crashed .dot { background: #ff6b6b; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; } 50% { opacity: 0.3; }
+    }
+
+    .bot-controls { display: flex; gap: 6px; }
+
+    /* ── Log Panel ── */
+    .log-header {
+      padding: 12px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .log-title { font-weight: 600; font-size: 15px; }
+    .log-subtitle { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .log-actions { display: flex; gap: 8px; align-items: center; }
+
+    .log-scroll {
+      flex: 1; overflow-y: auto; padding: 12px 20px;
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 12.5px; line-height: 1.6;
+      background: var(--bg);
+    }
+
+    .log-entry {
+      padding: 2px 8px; border-radius: 4px; margin-bottom: 2px;
+      display: flex; gap: 10px;
+    }
+    .log-entry:hover { background: rgba(255,255,255,0.03); }
+    .log-ts { color: var(--muted); min-width: 85px; flex-shrink: 0; }
+    .log-line { word-break: break-all; }
+    .log-entry.success { background: var(--success-bg); color: #86efac; }
+    .log-entry.error   { background: var(--error-bg); color: #fca5a5; }
+    .log-entry.warn    { background: var(--warn-bg); color: #fcd34d; }
+    .log-entry.info    { color: var(--text); }
+
+    .log-empty {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; height: 100%;
+      color: var(--muted); font-family: inherit; font-size: 14px; gap: 8px;
+    }
+    .log-empty .icon { font-size: 40px; }
+
+    /* ── Accept Counter ── */
+    .accept-badge {
+      background: var(--accent);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 10px;
+      padding: 1px 7px;
+      margin-left: 6px;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+    /* ── No bot selected ── */
+    .no-selection {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      color: var(--muted); gap: 12px;
+    }
+    .no-selection .big { font-size: 48px; }
+    .no-selection p { font-size: 15px; }
+
+    /* ── Section label ── */
+    .section-label {
+      padding: 8px 18px; font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 1px;
+      color: var(--muted);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* ── Mobile ── */
+    @media (max-width: 720px) {
+      .main { flex-direction: column; height: auto; }
+      .bot-list { width: 100%; border-right: none; border-bottom: 1px solid var(--border); max-height: 45vh; }
+      .log-panel { height: 55vh; }
+      .stats-bar { gap: 10px; }
+      .stat-card { min-width: 90px; padding: 10px 14px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">⚡ BotManager <span>ValueNet Automation</span></div>
+  </div>
+  <div class="ws-indicator">
+    <div class="ws-dot" id="wsDot"></div>
+    <span id="wsLabel">Connecting...</span>
+  </div>
+</div>
+
+<!-- Global Actions -->
+<div class="global-actions">
+  <button class="btn btn-primary" onclick="startAll()">▶ Start All</button>
+  <button class="btn btn-danger" onclick="stopAll()">■ Stop All</button>
+  <button class="btn btn-outline" onclick="clearLogs()">🗑 Clear Logs</button>
+</div>
+
+<!-- Stats Bar -->
+<div class="stats-bar">
+  <div class="stat-card green">
+    <div class="val" id="statRunning">0</div>
+    <div class="lbl">Running</div>
+  </div>
+  <div class="stat-card red">
+    <div class="val" id="statStopped">0</div>
+    <div class="lbl">Stopped</div>
+  </div>
+  <div class="stat-card accent">
+    <div class="val" id="statAccepted">0</div>
+    <div class="lbl">Total Accepted</div>
+  </div>
+  <div class="stat-card yellow">
+    <div class="val" id="statCrashed">0</div>
+    <div class="lbl">Crashed</div>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <!-- Bot List -->
+  <div class="bot-list" id="botList">
+    <div class="section-label">Bots (13)</div>
+    <!-- populated by JS -->
+  </div>
+
+  <!-- Log Panel -->
+  <div class="log-panel" id="logPanel">
+    <div class="no-selection" id="noSelection">
+      <div class="big">🤖</div>
+      <p>Select a bot to view its logs</p>
+    </div>
+    <!-- populated dynamically -->
+  </div>
+</div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+let bots = {};          // botId → bot object
+let selectedBot = null;
+let ws = null;
+let autoScroll = true;
+const BASE = window.location.origin;
+const WS_URL = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host;
+
+// ─── WebSocket ────────────────────────────────────────────────────────────────
+function connectWS() {
+  ws = new WebSocket(WS_URL);
+
+  ws.onopen = () => {
+    setWsStatus(true);
+  };
+
+  ws.onclose = () => {
+    setWsStatus(false);
+    setTimeout(connectWS, 3000);
+  };
+
+  ws.onerror = () => setWsStatus(false);
+
+  ws.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      handleMessage(msg);
+    } catch (_) {}
+  };
+}
+
+function setWsStatus(connected) {
+  const dot = document.getElementById('wsDot');
+  const lbl = document.getElementById('wsLabel');
+  dot.className = 'ws-dot' + (connected ? ' connected' : '');
+  lbl.textContent = connected ? 'Live' : 'Reconnecting...';
+}
+
+function handleMessage(msg) {
+  if (msg.type === 'init') {
+    msg.bots.forEach(b => { bots[b.id] = b; });
+    renderBotList();
+    updateStats();
+    if (selectedBot) renderLogPanel(selectedBot);
+  } else if (msg.type === 'status') {
+    if (bots[msg.botId]) {
+      bots[msg.botId].status = msg.status;
+      if (msg.startedAt) bots[msg.botId].startedAt = msg.startedAt;
+      updateBotCard(msg.botId);
+      updateStats();
+      if (selectedBot === msg.botId) updateLogHeader(msg.botId);
+    }
+  } else if (msg.type === 'log') {
+    if (bots[msg.botId]) {
+      if (!bots[msg.botId].recentLogs) bots[msg.botId].recentLogs = [];
+      bots[msg.botId].recentLogs.push(msg.entry);
+      if (bots[msg.botId].recentLogs.length > 500) bots[msg.botId].recentLogs.shift();
+
+      // Count accepts
+      if (msg.entry.level === 'success' && (msg.entry.line.includes('ACCEPTED') || msg.entry.line.includes('⚡'))) {
+        bots[msg.botId].acceptCount = (bots[msg.botId].acceptCount || 0) + 1;
+        updateBotCard(msg.botId);
+        updateStats();
+      }
+
+      if (selectedBot === msg.botId) appendLogEntry(msg.entry);
+    }
+  }
+}
+
+// ─── API ──────────────────────────────────────────────────────────────────────
+async function apiPost(url) {
+  const r = await fetch(BASE + url, { method: 'POST' });
+  return r.json();
+}
+
+async function startBot(id) {
+  await apiPost(`/api/bots/${id}/start`);
+}
+
+async function stopBot(id) {
+  await apiPost(`/api/bots/${id}/stop`);
+}
+
+async function startAll() {
+  await apiPost('/api/bots/start-all');
+}
+
+async function stopAll() {
+  await apiPost('/api/bots/stop-all');
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+function statusHtml(status) {
+  const labels = {
+    running: 'Running', stopped: 'Stopped', starting: 'Starting...',
+    stopping: 'Stopping...', error: 'Error', crashed: 'Crashed'
+  };
+  return `<span class="status-badge status-${status}"><span class="dot"></span>${labels[status] || status}</span>`;
+}
+
+function timeSince(iso) {
+  if (!iso) return '';
+  const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if (diff < 60) return `${diff}s`;
+  if (diff < 3600) return `${Math.floor(diff/60)}m`;
+  return `${Math.floor(diff/3600)}h ${Math.floor((diff%3600)/60)}m`;
+}
+
+function renderBotList() {
+  const el = document.getElementById('botList');
+  el.innerHTML = '<div class="section-label">Bots (' + Object.keys(bots).length + ')</div>';
+  Object.values(bots).forEach(b => {
+    const card = document.createElement('div');
+    card.className = 'bot-card' + (selectedBot === b.id ? ' active' : '');
+    card.id = `card-${b.id}`;
+    card.onclick = () => selectBot(b.id);
+    card.innerHTML = botCardInner(b);
+    el.appendChild(card);
+  });
+}
+
+function botCardInner(b) {
+  const accepts = b.acceptCount > 0
+    ? `<span class="accept-badge">✓${b.acceptCount}</span>` : '';
+  const uptime = b.status === 'running' && b.startedAt ? `· ${timeSince(b.startedAt)}` : '';
+  return `
+    <div class="bot-info">
+      <div class="bot-name">${b.display}${accepts}</div>
+      <div class="bot-user">${b.username}</div>
+      <div class="bot-meta">${statusHtml(b.status)} <span style="color:var(--muted);font-size:11px">${uptime}</span></div>
+    </div>
+    <div class="bot-controls">
+      ${b.status === 'running' || b.status === 'starting'
+        ? `<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();stopBot('${b.id}')">■</button>`
+        : `<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();startBot('${b.id}')">▶</button>`
+      }
+    </div>
+  `;
+}
+
+function updateBotCard(id) {
+  const card = document.getElementById(`card-${id}`);
+  if (!card) return;
+  card.className = 'bot-card' + (selectedBot === id ? ' active' : '');
+  card.innerHTML = botCardInner(bots[id]);
+  card.onclick = () => selectBot(id);
+}
+
+function updateStats() {
+  const vals = Object.values(bots);
+  document.getElementById('statRunning').textContent = vals.filter(b => b.status === 'running').length;
+  document.getElementById('statStopped').textContent = vals.filter(b => b.status === 'stopped').length;
+  document.getElementById('statCrashed').textContent = vals.filter(b => b.status === 'crashed' || b.status === 'error').length;
+  document.getElementById('statAccepted').textContent = vals.reduce((s, b) => s + (b.acceptCount || 0), 0);
+}
+
+// ─── Log Panel ────────────────────────────────────────────────────────────────
+function selectBot(id) {
+  selectedBot = id;
+  document.querySelectorAll('.bot-card').forEach(c => c.classList.remove('active'));
+  const card = document.getElementById(`card-${id}`);
+  if (card) card.classList.add('active');
+  renderLogPanel(id);
+}
+
+function renderLogPanel(id) {
+  const b = bots[id];
+  if (!b) return;
+  const panel = document.getElementById('logPanel');
+  panel.innerHTML = `
+    <div class="log-header">
+      <div>
+        <div class="log-title">📋 ${b.display} Logs</div>
+        <div class="log-subtitle" id="logSubtitle-${id}">${b.username} · ${b.status}</div>
+      </div>
+      <div class="log-actions">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer">
+          <input type="checkbox" id="autoScrollCheck" ${autoScroll?'checked':''} onchange="autoScroll=this.checked">
+          Auto-scroll
+        </label>
+        <button class="btn btn-outline btn-sm" onclick="clearLogs()">Clear</button>
+        ${b.status === 'running'
+          ? `<button class="btn btn-danger btn-sm" onclick="stopBot('${id}')">■ Stop</button>`
+          : `<button class="btn btn-primary btn-sm" onclick="startBot('${id}')">▶ Start</button>`
+        }
+      </div>
+    </div>
+    <div class="log-scroll" id="logScroll"></div>
+  `;
+
+  const scroll = document.getElementById('logScroll');
+  if (!b.recentLogs || !b.recentLogs.length) {
+    scroll.innerHTML = `<div class="log-empty"><div class="icon">💤</div><div>No logs yet — start the bot to see output</div></div>`;
+  } else {
+    b.recentLogs.forEach(entry => scroll.appendChild(makeLogEl(entry)));
+    scrollToBottom();
+  }
+}
+
+function updateLogHeader(id) {
+  const el = document.getElementById(`logSubtitle-${id}`);
+  if (el && bots[id]) el.textContent = `${bots[id].username} · ${bots[id].status}`;
+}
+
+function makeLogEl(entry) {
+  const div = document.createElement('div');
+  div.className = `log-entry ${entry.level || 'info'}`;
+  const t = new Date(entry.ts);
+  const ts = t.toLocaleTimeString('en-US', { hour12: false });
+  div.innerHTML = `<span class="log-ts">${ts}</span><span class="log-line">${escHtml(entry.line)}</span>`;
+  return div;
+}
+
+function appendLogEntry(entry) {
+  const scroll = document.getElementById('logScroll');
+  if (!scroll) return;
+
+  // Remove empty state if present
+  const empty = scroll.querySelector('.log-empty');
+  if (empty) scroll.innerHTML = '';
+
+  scroll.appendChild(makeLogEl(entry));
+  if (autoScroll) scrollToBottom();
+}
+
+function scrollToBottom() {
+  const el = document.getElementById('logScroll');
+  if (el) el.scrollTop = el.scrollHeight;
+}
+
+function clearLogs() {
+  if (selectedBot && bots[selectedBot]) {
+    bots[selectedBot].recentLogs = [];
+  }
+  const scroll = document.getElementById('logScroll');
+  if (scroll) scroll.innerHTML = `<div class="log-empty"><div class="icon">🗑</div><div>Logs cleared</div></div>`;
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
+// ─── Uptime Ticker ────────────────────────────────────────────────────────────
+setInterval(() => {
+  Object.keys(bots).forEach(id => {
+    if (bots[id].status === 'running') updateBotCard(id);
+  });
+}, 30000);
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+connectWS();
+</script>
+</body>
+</html>
