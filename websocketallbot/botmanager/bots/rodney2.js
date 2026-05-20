@@ -66,12 +66,12 @@ function isZipAllowed(zip) {
 
   const chromeBin = process.env.CHROME_BIN;
   if (chromeBin) options.setChromeBinaryPath(chromeBin);
-  const service = process.env.CHROMEDRIVER_PATH
-    ? new chrome.ServiceBuilder(process.env.CHROMEDRIVER_PATH).build()
+  const serviceBuilder = process.env.CHROMEDRIVER_PATH
+    ? new chrome.ServiceBuilder(process.env.CHROMEDRIVER_PATH)
     : undefined;
-  let driver = await new Builder().forBrowser("chrome").setChromeOptions(options)
-    .setChromeService(service)
-    .build();
+  const driverBuilder = new Builder().forBrowser("chrome").setChromeOptions(options);
+  if (serviceBuilder) driverBuilder.setChromeService(serviceBuilder);
+  let driver = await driverBuilder.build();
   let lastLoginTime = Date.now();
   let lastRefresh = Date.now();
 
